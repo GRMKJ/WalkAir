@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">WalkAir</string>
+    <string name="welcome">Bienvenid@</string>
+    <string name="new_training">Nuevo Entrenamiento</string>
+    <string name="pasos">Pasos</string>
+    <string name="bpm">BPM</string>
+    <string name="meters">metros</string>
+
+</resources>
