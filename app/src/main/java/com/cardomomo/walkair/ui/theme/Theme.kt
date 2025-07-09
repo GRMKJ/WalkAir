@@ -1,4 +1,4 @@
-package com.example.compose
+package com.cardomomo.walkair.ui.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -17,7 +17,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.example.ui.theme.AppTypography
+import com.cardomomo.walkair.ui.theme.AppTypography
+import com.cardomomo.walkair.ui.theme.backgroundDark
+import com.cardomomo.walkair.ui.theme.backgroundDarkHighContrast
 
 private val lightScheme = lightColorScheme(
     primary = primaryLight,
