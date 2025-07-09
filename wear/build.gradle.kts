@@ -30,9 +30,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
     useLibrary("wear-sdk")
     buildFeatures {
         compose = true
@@ -41,6 +38,10 @@ android {
 
 dependencies {
 
+    implementation("com.google.android.gms:play-services-wearable:18.1.0")
+    implementation("androidx.wear:wear:1.2.0")
+    // UI Wear OS Compose
+    implementation("androidx.wear.compose:compose-material:1.2.0")
     implementation(libs.play.services.wearable)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)
