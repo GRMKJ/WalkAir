@@ -1,6 +1,7 @@
 package com.cardomomo.walkair
 
 import androidx.room.*
+import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface WearDataDao {
@@ -9,6 +10,9 @@ interface WearDataDao {
 
     @Query("SELECT * FROM entrenamientos ORDER BY start DESC")
     suspend fun getAll(): List<WearData>
+
+    @Query("SELECT * FROM entrenamientos ORDER BY start DESC")
+    fun getAllTrainings(): Flow<List<WearData>>
 
     @Delete
     suspend fun delete(data: WearData)

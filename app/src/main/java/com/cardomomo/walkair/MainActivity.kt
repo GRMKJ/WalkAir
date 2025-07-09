@@ -19,18 +19,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Menu
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.view.WindowCompat
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -41,6 +36,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.LaunchedEffect
@@ -48,8 +45,11 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
+import java.time.Duration
+import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,8 +66,7 @@ class MainActivity : ComponentActivity() {
     fun MainScreen() {
         val navController = rememberNavController()
         val screens = listOf(Screen.Home, Screen.Registro, Screen.Ajustes)
-        val navBackStackEntry by navController.currentBackStackEntryAsState()
-        val currentRoute = navBackStackEntry?.destination?.route
+
 
         Scaffold(
             bottomBar = {
@@ -102,7 +101,7 @@ class MainActivity : ComponentActivity() {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    fun Inicio() {
+    fun Inicio(viewModel: WearViewModel = viewModel()) {
         val context = LocalContext.current
 
         val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
@@ -111,6 +110,16 @@ class MainActivity : ComponentActivity() {
         val username by SettingsDataStore.usernameFlow(context).collectAsState(initial = "Usuario")
         val stepGoal by SettingsDataStore.stepGoalFlow(context).collectAsState(initial = 6000)
         val caloriesGoal by SettingsDataStore.caloriesGoalFlow(context).collectAsState(initial = 300f)
+
+        // Leer los entrenamientos de SQLite
+        val trainings by viewModel.allTrainings.collectAsState(initial = emptyList())
+
+        // Calcular agregados
+        val totalSteps = trainings.sumOf { it.steps }
+        val totalCalories = trainings.sumOf { it.calories.toInt() }
+        val averageHeartRate = if (trainings.isNotEmpty()) {
+            trainings.map { it.heartRate }.average().toInt()
+        } else 0
 
         WindowCompat.getInsetsController(window, window.decorView)
             .isAppearanceLightStatusBars = isSystemInDarkTheme()
@@ -121,6 +130,7 @@ class MainActivity : ComponentActivity() {
                 LargeTopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = MaterialTheme.colorScheme.background,
                         titleContentColor = MaterialTheme.colorScheme.primary,
                     ),
                     title = {
@@ -137,7 +147,10 @@ class MainActivity : ComponentActivity() {
             HomeContent(
                 padding = innerPadding,
                 stepGoal = stepGoal,
-                caloriesGoal = caloriesGoal.toInt()
+                caloriesGoal = caloriesGoal.toInt(),
+                totalSteps = totalSteps,
+                totalCalories = totalCalories,
+                avgHeartRate = averageHeartRate
             )
         }
     }
@@ -145,9 +158,12 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun Registro() {
+
         val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
+
         WindowCompat.getInsetsController(window, window.decorView)
             .isAppearanceLightStatusBars = isSystemInDarkTheme()
+
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
 
@@ -155,6 +171,7 @@ class MainActivity : ComponentActivity() {
                 LargeTopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = MaterialTheme.colorScheme.background,
                         titleContentColor = MaterialTheme.colorScheme.primary,
                     ),
                     title = {
@@ -168,7 +185,7 @@ class MainActivity : ComponentActivity() {
                 )
             },
         ) { innerPadding ->
-            RegistroContent(innerPadding)
+            RegistroContent(x0 = innerPadding, viewModel = viewModel())
         }
     }
 
@@ -185,6 +202,7 @@ class MainActivity : ComponentActivity() {
                 LargeTopAppBar(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.background,
+                        scrolledContainerColor = MaterialTheme.colorScheme.background,
                         titleContentColor = MaterialTheme.colorScheme.primary,
                     ),
                     title = {
@@ -202,32 +220,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-
-    @Composable
-    private fun NavBar(){
-        var selectedItem by remember { mutableIntStateOf(0) }
-        val items = listOf("Inicio", "Registro", "Ajustes")
-        val selectedIcons = listOf(Icons.Filled.Home, Icons.Filled.Menu, Icons.Filled.Settings)
-        val unselectedIcons =
-            listOf(Icons.Outlined.Home, Icons.Outlined.Menu, Icons.Outlined.Settings)
-
-        NavigationBar {
-            items.forEachIndexed { index, item ->
-                NavigationBarItem(
-                    icon = {
-                        Icon(
-                            if (selectedItem == index) selectedIcons[index] else unselectedIcons[index],
-                            contentDescription = item,
-                        )
-                    },
-                    label = { Text(item) },
-                    selected = selectedItem == index,
-                    onClick = { selectedItem = index },
-                )
-            }
-        }
-    }
-
     sealed class Screen(val route: String, val icon: ImageVector, val label: String){
         object Home : Screen("home", Icons.Filled.Home, "Inicio")
         object Registro : Screen("registro", Icons.Filled.Menu, "Registro")
@@ -235,11 +227,7 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun HomeContent(
-        padding: PaddingValues,
-        stepGoal: Int,
-        caloriesGoal: Int
-    ) {
+    private fun HomeContent(padding: PaddingValues,stepGoal: Int,caloriesGoal: Int,totalSteps: Int,totalCalories: Int,avgHeartRate: Int) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -247,9 +235,9 @@ class MainActivity : ComponentActivity() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            InfoCard("Pasos", R.drawable.outline_steps_24, 50, "pasos", stepGoal, true)
-            InfoCard("Calorías", R.drawable.baseline_local_fire_department_24, 500, "cal", caloriesGoal, true)
-            InfoCard("Frecuencia Cardiaca", R.drawable.outline_favorite_24, 120, "bpm", 0, false)
+            InfoCard("Pasos", R.drawable.outline_steps_24, totalSteps, "pasos", stepGoal, true)
+            InfoCard("Calorías", R.drawable.baseline_local_fire_department_24, totalCalories, "cal", caloriesGoal, true)
+            InfoCard("Frecuencia Cardiaca Promedio", R.drawable.outline_favorite_24, avgHeartRate, "bpm", 0, false)
 
             Button(onClick = { /* acción */ }) {
                 Text("Sincronizar")
@@ -319,10 +307,106 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
-    private fun RegistroContent(x0: PaddingValues){
+    private fun RegistroContent(x0: PaddingValues, viewModel: WearViewModel = viewModel()){
+        val trainings by viewModel.allTrainings.collectAsState(initial = emptyList())
+
+        LazyColumn(
+            modifier = Modifier
+                .padding(x0)
+                .fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(trainings) { training ->
+                TrainingCard(training)
+            }
+
+            if (trainings.isEmpty()) {
+                item {
+                    Text(
+                        "No hay entrenamientos registrados.",
+                        modifier = Modifier.padding(8.dp),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
 
     }
+
+    @Composable
+    private fun TrainingCard(data: WearData) {
+        val duration = Duration.between(data.start, data.ending)
+        val hours = duration.toHours()
+        val minutes = (duration.toMinutes() % 60)
+        val seconds = (duration.seconds % 60)
+
+        val formattedDuration = buildString {
+            if (hours > 0) append("${hours}h ")
+            if (minutes > 0) append("${minutes}m ")
+            append("${seconds}s")
+        }
+
+        ElevatedCard(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.elevatedCardElevation()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.outline_calendar_today_24),
+                        contentDescription = "Fecha",
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text(
+                        data.start.format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),
+                        style = MaterialTheme.typography.labelMedium
+                    )
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.outline_nest_clock_farsight_analog_24),
+                        contentDescription = "Duración",
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Duración: $formattedDuration")
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.outline_steps_24),
+                        contentDescription = "Pasos",
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Pasos: ${data.steps}")
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.baseline_local_fire_department_24),
+                        contentDescription = "Calorías",
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("Calorías: ${data.calories}")
+                }
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.outline_favorite_24),
+                        contentDescription = "Frecuencia Cardiaca",
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
+                    Text("FC: ${data.heartRate} bpm")
+                }
+            }
+        }
+    }
+
+
     @Composable
     private fun AjustesContent(x0: PaddingValues) {
         val context = LocalContext.current
