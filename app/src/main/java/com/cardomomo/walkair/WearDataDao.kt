@@ -9,10 +9,7 @@ interface WearDataDao {
     suspend fun insert(data: WearData)
 
     @Query("SELECT * FROM entrenamientos ORDER BY start DESC")
-    suspend fun getAll(): List<WearData>
-
-    @Query("SELECT * FROM entrenamientos ORDER BY start DESC")
-    fun getAllTrainings(): Flow<List<WearData>>
+    fun getAll(): Flow<List<WearData>>
 
     @Delete
     suspend fun delete(data: WearData)

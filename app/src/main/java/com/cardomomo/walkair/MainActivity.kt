@@ -54,7 +54,7 @@ import java.time.format.DateTimeFormatter
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(Color.BLACK, Color.WHITE))
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.auto(Color.WHITE, Color.WHITE))
         setContent {
             MaterialTheme {
                 MainScreen()
@@ -112,7 +112,7 @@ class MainActivity : ComponentActivity() {
         val caloriesGoal by SettingsDataStore.caloriesGoalFlow(context).collectAsState(initial = 300f)
 
         // Leer los entrenamientos de SQLite
-        val trainings by viewModel.allTrainings.collectAsState(initial = emptyList())
+        val trainings by viewModel.getAll.collectAsState(initial = emptyList())
 
         // Calcular agregados
         val totalSteps = trainings.sumOf { it.steps }
@@ -310,7 +310,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun RegistroContent(x0: PaddingValues, viewModel: WearViewModel = viewModel()){
-        val trainings by viewModel.allTrainings.collectAsState(initial = emptyList())
+        val trainings by viewModel.getAll.collectAsState(initial = emptyList())
 
         LazyColumn(
             modifier = Modifier
@@ -405,7 +405,6 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
-
 
     @Composable
     private fun AjustesContent(x0: PaddingValues) {
@@ -555,6 +554,4 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
-
-
 }
