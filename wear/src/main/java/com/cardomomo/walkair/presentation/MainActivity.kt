@@ -1,13 +1,21 @@
 package com.cardomomo.walkair.presentation
 
 import android.Manifest
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.hardware.*
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.wear.compose.material3.*
@@ -17,7 +25,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.wear.compose.material.Scaffold
 import androidx.wear.compose.material3.MaterialTheme
 import com.cardomomo.walkair.presentation.theme.WalkAirWearTheme
@@ -52,15 +63,30 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     private var _calories = mutableStateOf(0f)
 
+    private var startedFromNotification = false
+    private val shouldStartWorkout = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
+        startedFromNotification = intent.getBooleanExtra("start_training", false)
+        val startTraining = intent.getBooleanExtra("start_training", false)
+        // Sensores
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
         accelerometerSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         heartRateSensor = sensorManager.getDefaultSensor(Sensor.TYPE_HEART_RATE)
 
         requestPermissionsIfNeeded()
+        requestNotificationPermissionIfNeeded()
 
+        // Mensajes desde el teléfono
+        Wearable.getMessageClient(this).addListener { messageEvent ->
+            if (messageEvent.path == "/start_workout") {
+                Log.d("WearTrigger", "Mensaje recibido desde el teléfono: iniciar entrenamiento")
+
+                // Lanzar trigger para UI
+                shouldStartWorkout.value = true
+            }
+        }
         setContent {
             WalkAirWearTheme {
                 Entrenamiento(
@@ -72,7 +98,9 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     },
                     onFinish = { data ->
                         sendToMobileApp(data)
-                    }
+                        shouldStartWorkout.value = false
+                    },
+                    startImmediately = startedFromNotification
                 )
             }
         }
@@ -83,7 +111,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         steps: Int,
         heartRate: Float,
         onReset: () -> Unit,
-        onFinish: (WearData) -> Unit
+        onFinish: (WearData) -> Unit,
+        startImmediately: Boolean = false
     ) {
         var isRunning by remember { mutableStateOf(false) }
         var isPaused by remember { mutableStateOf(false) }
@@ -94,7 +123,16 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         val currentSteps by rememberUpdatedState(steps)
         val currentHeartRate by rememberUpdatedState(heartRate)
 
+        LaunchedEffect(startImmediately) {
+            if (startImmediately) {
+                isRunning = true
+                isPaused = false
+            }
+        }
+
+
         LaunchedEffect(isRunning, isPaused) { // Only restart if isRunning or isPaused changes
+
             if (isRunning && !isPaused) {
                 launch {
                     // snapshotFlow now reads the 'currentSteps' and 'currentHeartRate' State objects.
@@ -161,6 +199,14 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
+    fun endWorkout() {
+        // Cierra MainActivity y vuelve a WaitingActivity
+        val intent = Intent(this, WaitingActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        startActivity(intent)
+        finish()
+    }
 
     @Composable
     fun StartWorkoutScreen(onStart: () -> Unit) {
@@ -259,6 +305,18 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             }
     }
 
+    @Composable
+    fun WaitForTriggerScreen() {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("Esperando entrenamiento...", style = MaterialTheme.typography.bodyLarge)
+        }
+    }
+
     override fun onSensorChanged(event: SensorEvent?) {
         event?.let {
             when (it.sensor.type) {
@@ -322,5 +380,42 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onDestroy() {
         super.onDestroy()
         sensorManager.unregisterListener(this)
+    }
+
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            Log.d("Permission", "Permiso de notificación concedido")
+        } else {
+            Toast.makeText(this, "Permiso de notificación denegado", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // En la actividad
+    private val startWorkoutReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            shouldStartWorkout.value = true
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        LocalBroadcastManager.getInstance(this).registerReceiver(startWorkoutReceiver, IntentFilter("com.cardomomo.walkair.START_WORKOUT"))
+    }
+
+    override fun onPause() {
+        super.onPause()
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(startWorkoutReceiver)
     }
 }
