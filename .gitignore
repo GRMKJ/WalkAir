@@ -13,3 +13,11 @@
 .externalNativeBuild
 .cxx
 local.properties
+/wear/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+/wear/src/main/ic_launcher-playstore.png
+/wear/src/main/res/mipmap-hdpi/ic_launcher_foreground.webp
+/wear/src/main/res/mipmap-mdpi/ic_launcher_foreground.webp
+/wear/src/main/res/mipmap-xhdpi/ic_launcher_foreground.webp
+/wear/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.webp
+/wear/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.webp
+/wear/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml
