@@ -6,10 +6,9 @@ WalkAir es una aplicación Android y Wear OS que te ayuda a monitorear tu activi
 
 ## 📱 Características principales
 
-- ✅ Registro de pasos diarios en tiempo real.
+- ✅ Registro de pasos durante el entrenamiento en tiempo real.
 - ❤️ Monitoreo de frecuencia cardíaca usando sensores nativos.
 - 🔥 Cálculo estimado de calorías quemadas.
-- 📊 Resumen semanal y logros desbloqueables.
 - 🔄 Sincronización Wear OS ↔ Android.
 - 🎯 Configuración personalizada de metas de pasos y calorías.
 - 🌙 Modo nocturno, notificaciones y vibración opcional.
