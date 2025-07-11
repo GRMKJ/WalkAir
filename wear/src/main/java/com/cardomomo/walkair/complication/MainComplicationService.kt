@@ -1,4 +1,4 @@
-package com.cardomomo.walkairwear.complication
+package com.cardomomo.walkair.complication
 
 import androidx.wear.watchface.complications.data.ComplicationData
 import androidx.wear.watchface.complications.data.ComplicationType

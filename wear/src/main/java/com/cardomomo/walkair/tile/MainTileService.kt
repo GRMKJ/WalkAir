@@ -1,4 +1,4 @@
-package com.cardomomo.walkairwear.tile
+package com.cardomomo.walkair.tile
 
 import android.content.Context
 import androidx.wear.protolayout.ColorBuilders.argb

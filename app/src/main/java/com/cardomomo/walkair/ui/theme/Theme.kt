@@ -1,5 +1,4 @@
 package com.cardomomo.walkair.ui.theme
-import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -7,19 +6,10 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
-import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
-import androidx.core.view.WindowCompat
-import com.cardomomo.walkair.ui.theme.AppTypography
-import com.cardomomo.walkair.ui.theme.backgroundDark
-import com.cardomomo.walkair.ui.theme.backgroundDarkHighContrast
 
 private val lightScheme = lightColorScheme(
     primary = primaryLight,
@@ -263,30 +253,29 @@ val unspecified_scheme = ColorFamily(
 
 @Composable
 fun AppTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    // This parameter name 'useDarkTheme' now clearly indicates its purpose.
+    // It defaults to the system setting if not provided by the caller.
+    useDarkTheme: Boolean = isSystemInDarkTheme(),
+    dynamicColor: Boolean = true, // Dynamic color is available on Android 12+
     content: @Composable() () -> Unit
 ) {
+    // Now 'useDarkTheme' is the single source of truth for deciding the theme within this function.
+    // When called from MainActivity, it will take the value of 'darkMode' from your settings.
+    // If called from somewhere else without specifying 'useDarkTheme', it will use isSystemInDarkTheme().
 
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+            val context = LocalContext.current
+            if (useDarkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        }
+        useDarkTheme -> darkScheme
+        else -> lightScheme
+    }
 
-  val colorScheme = when {
-      dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-          val context = LocalContext.current
-          if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-      }
-
-      darkTheme -> darkScheme
-      else -> lightScheme
-  }
-
-
-
-  MaterialTheme(
-    colorScheme = colorScheme,
-    typography = AppTypography,
-    content = content
-  )
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = AppTypography,
+        content = content
+    )
 }
-
 

@@ -1,14 +1,11 @@
 package com.cardomomo.walkair
 
-import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.material3.*
@@ -47,16 +44,33 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.rememberNavController
+import com.cardomomo.walkair.ui.theme.*
+import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.launch
 import java.time.Duration
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.tasks.await
+
+
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge(statusBarStyle = SystemBarStyle.light(Color.BLACK, Color.WHITE))
+
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
         setContent {
-            MaterialTheme {
+            val context = LocalContext.current
+            val darkMode by SettingsDataStore.darkModeFlow(context).collectAsState(initial = false)
+
+            LaunchedEffect(darkMode) {
+                Log.d("ThemeDebug", "darkMode = $darkMode")
+                WindowCompat.getInsetsController(window, window.decorView)
+                    ?.isAppearanceLightStatusBars = !darkMode
+            }
+
+            AppTheme(useDarkTheme = darkMode) {
                 MainScreen()
             }
         }
@@ -66,7 +80,7 @@ class MainActivity : ComponentActivity() {
     fun MainScreen() {
         val navController = rememberNavController()
         val screens = listOf(Screen.Home, Screen.Registro, Screen.Ajustes)
-
+        val context = LocalContext.current
 
         Scaffold(
             bottomBar = {
@@ -104,6 +118,7 @@ class MainActivity : ComponentActivity() {
     fun Inicio(viewModel: WearViewModel = viewModel()) {
         val context = LocalContext.current
 
+
         val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
         // Leer los valores del DataStore
@@ -112,7 +127,7 @@ class MainActivity : ComponentActivity() {
         val caloriesGoal by SettingsDataStore.caloriesGoalFlow(context).collectAsState(initial = 300f)
 
         // Leer los entrenamientos de SQLite
-        val trainings by viewModel.allTrainings.collectAsState(initial = emptyList())
+        val trainings by viewModel.getAll.collectAsState(initial = emptyList())
 
         // Calcular agregados
         val totalSteps = trainings.sumOf { it.steps }
@@ -121,8 +136,6 @@ class MainActivity : ComponentActivity() {
             trainings.map { it.heartRate }.average().toInt()
         } else 0
 
-        WindowCompat.getInsetsController(window, window.decorView)
-            .isAppearanceLightStatusBars = isSystemInDarkTheme()
 
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -161,9 +174,6 @@ class MainActivity : ComponentActivity() {
 
         val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
 
-        WindowCompat.getInsetsController(window, window.decorView)
-            .isAppearanceLightStatusBars = isSystemInDarkTheme()
-
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
 
@@ -193,8 +203,6 @@ class MainActivity : ComponentActivity() {
     @Composable
     fun Ajustes(){
         val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-        WindowCompat.getInsetsController(window, window.decorView)
-            .isAppearanceLightStatusBars = isSystemInDarkTheme()
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
 
@@ -227,7 +235,17 @@ class MainActivity : ComponentActivity() {
     }
 
     @Composable
-    private fun HomeContent(padding: PaddingValues,stepGoal: Int,caloriesGoal: Int,totalSteps: Int,totalCalories: Int,avgHeartRate: Int) {
+    private fun HomeContent(
+        padding: PaddingValues,
+        stepGoal: Int,
+        caloriesGoal: Int,
+        totalSteps: Int,
+        totalCalories: Int,
+        avgHeartRate: Int
+    ) {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -239,11 +257,30 @@ class MainActivity : ComponentActivity() {
             InfoCard("Calorías", R.drawable.baseline_local_fire_department_24, totalCalories, "cal", caloriesGoal, true)
             InfoCard("Frecuencia Cardiaca Promedio", R.drawable.outline_favorite_24, avgHeartRate, "bpm", 0, false)
 
-            Button(onClick = { /* acción */ }) {
-                Text("Sincronizar")
+            Button(onClick = {
+                scope.launch {
+                    try {
+                        val messageClient = Wearable.getMessageClient(context)
+                        val nodes = Wearable.getNodeClient(context).connectedNodes.await()
+                        for (node in nodes) {
+                            messageClient.sendMessage(node.id, "/start_workout", null).await()
+                            Log.d("PhoneToWear", "Mensaje enviado a nodo ${node.displayName}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("PhoneToWear", "Error al enviar mensaje: ${e.message}")
+                    }
+                }
+            }) {
+                Icon(
+                    painter = painterResource(id = R.drawable.outline_play_arrow_24),
+                    contentDescription = "Iniciar entrenamiento"
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Iniciar un Entrenamiento")
             }
         }
     }
+
     @Composable
     private fun ProgBar(now: Int, goal: Int) {
         val progress = (now.toFloat() / goal.toFloat()).coerceIn(0f, 1f)
@@ -310,7 +347,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun RegistroContent(x0: PaddingValues, viewModel: WearViewModel = viewModel()){
-        val trainings by viewModel.allTrainings.collectAsState(initial = emptyList())
+        val trainings by viewModel.getAll.collectAsState(initial = emptyList())
 
         LazyColumn(
             modifier = Modifier
@@ -400,12 +437,11 @@ class MainActivity : ComponentActivity() {
                         contentDescription = "Frecuencia Cardiaca",
                         modifier = Modifier.padding(end = 8.dp)
                     )
-                    Text("FC: ${data.heartRate} bpm")
+                    Text("FC: ${String.format("%.1f", data.heartRate)} bpm")
                 }
             }
         }
     }
-
 
     @Composable
     private fun AjustesContent(x0: PaddingValues) {
@@ -521,6 +557,9 @@ class MainActivity : ComponentActivity() {
                 onClick = {
                     scope.launch {
                         SettingsDataStore.clearAll(context)
+
+                        val dao = WearDatabase.getDatabase(context).wearDataDao()
+                        dao.clearAll()
                         Toast.makeText(context, "Datos borrados", Toast.LENGTH_SHORT).show()
                     }
                 }
@@ -555,6 +594,4 @@ class MainActivity : ComponentActivity() {
             )
         }
     }
-
-
 }

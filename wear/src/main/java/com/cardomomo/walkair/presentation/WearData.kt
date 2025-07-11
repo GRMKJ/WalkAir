@@ -1,4 +1,4 @@
-package com.cardomomo.walkairwear.presentation
+package com.cardomomo.walkair.presentation
 
 import java.time.LocalDateTime
 import java.time.LocalTime
